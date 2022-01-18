@@ -1,4 +1,4 @@
-module github.com/jasakaranSM/go-downloader
+module github.com/jaskaranSM/go-downloader
 
 go 1.16
 
