@@ -7,7 +7,6 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
-	"github.com/dustin/go-humanize"
 ) 
 
 
