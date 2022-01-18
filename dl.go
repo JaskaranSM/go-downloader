@@ -96,7 +96,7 @@ func (dl *HTTPDownloader) Init(url string, conns int, dir string, filename strin
 	filename = path.Join(dir, filename)
 	dl.dlpath = filename
 
-	dl.size, err = strconv.Atoi(resp.Header.Get("Content-Length"))
+	dl.size, err = strconv.ParseInt(resp.Header.Get("Content-Length"), 10, 64)
 
 	if err != nil {
 		return mimetype, 0, errors.New("Not supported for download")
@@ -115,15 +115,15 @@ func (dl *HTTPDownloader) Init(url string, conns int, dir string, filename strin
 	}
 
 	dl.parts = make([]Part, dl.conns)
-	size := dl.size / dl.conns
+	size := dl.size / int64(dl.conns)
 
 	for i, part := range dl.parts {
 		part.id = i
 		part.url = dl.url
-		part.offset = i * size
+		part.offset = i * int(size)
 		switch {
 		case i == dl.conns-1:
-			part.size = dl.size - size*i
+			part.size = dl.size - size*int64(i)
 			break
 		default:
 			part.size = size
@@ -211,7 +211,7 @@ type Part struct {
 
 func (part *Part) Download(done chan error, quit chan bool) error {
 	client := http.Client{}
-	size := 4096
+	var size int64 = 4096
 	buffer := make([]byte, size)
 	req, err := http.NewRequest("GET", part.url, nil)
 	defer func() {
@@ -221,7 +221,7 @@ func (part *Part) Download(done chan error, quit chan bool) error {
 	if err != nil {
 		return err
 	}
-	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", part.offset, part.offset+part.size-1))
+	req.Header.Set("Range", fmt.Sprintf("bytes=%d-%d", part.offset, int64(part.offset)+part.size-1))
 	resp, err := client.Do(req)
 	if err != nil {
 		return err
@@ -240,7 +240,7 @@ func (part *Part) Download(done chan error, quit chan bool) error {
 			return err
 		}
 
-		nbytes, err = part.file.WriteAt(buffer[0:nbytes], int64(part.offset+part.dlsize))
+		nbytes, err = part.file.WriteAt(buffer[0:nbytes], int64(part.offset)+part.dlsize)
 		if err != nil {
 			return nil
 		}

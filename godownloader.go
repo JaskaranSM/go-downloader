@@ -7,8 +7,7 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
-) 
-
+)
 
 const (
 	EventStart    int = 0
@@ -256,9 +255,9 @@ func (d *DownloadEngine) MonitorHTTPProgress(dler *HTTPDownloader, dlinfo *Downl
 		}
 		dlinfo.CompletedLength = int64(progress.Downloaded)
 		dlinfo.TotalLength = int64(progress.Total)
-		speed := 0
-		if int(progress.Elapsed.Seconds()) != 0 {
-			speed = progress.Downloaded / int(progress.Elapsed.Seconds())
+		var speed int64 = 0
+		if int64(progress.Elapsed.Seconds()) != 0 {
+			speed = progress.Downloaded / int64(progress.Elapsed.Seconds())
 		}
 		dlinfo.Speed = int64(speed)
 		d.NotifyEvent(EventProgress, dlinfo.Gid)
