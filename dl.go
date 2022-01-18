@@ -28,7 +28,7 @@ type HTTPDownloader struct {
 	url         string
 	conns       int
 	file        *os.File
-	size        int
+	size        int64
 	parts       []Part
 	start       time.Time
 	end         time.Time
@@ -152,12 +152,12 @@ func (dl *HTTPDownloader) CancelDownload() {
 
 type ProgressStatus struct {
 	Status     string
-	Total      int
-	Downloaded int
+	Total      int64
+	Downloaded int64
 	Elapsed    time.Duration
 }
 
-func NewProgressStatus(status string, total, downloaded int, elapsed time.Duration) *ProgressStatus {
+func NewProgressStatus(status string, total, downloaded int64, elapsed time.Duration) *ProgressStatus {
 	return &ProgressStatus{
 		Status:     status,
 		Total:      total,
@@ -167,7 +167,7 @@ func NewProgressStatus(status string, total, downloaded int, elapsed time.Durati
 }
 
 func (dl HTTPDownloader) GetProgress() *ProgressStatus {
-	dlsize := 0
+	var dlsize int64
 	for _, part := range dl.parts {
 		dlsize += part.dlsize
 	}
@@ -204,8 +204,8 @@ type Part struct {
 	id     int
 	url    string
 	offset int
-	dlsize int
-	size   int
+	dlsize int64
+	size   int64
 	file   *os.File
 }
 
@@ -244,7 +244,7 @@ func (part *Part) Download(done chan error, quit chan bool) error {
 		if err != nil {
 			return nil
 		}
-		part.dlsize += nbytes
+		part.dlsize += int64(nbytes)
 		remaining := part.size - part.dlsize
 		switch {
 		case remaining == 0:
