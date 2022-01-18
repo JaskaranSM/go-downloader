@@ -181,7 +181,9 @@ func (d *DownloadEngine) HandleDownloadRequest(dr *DownloadRequest) string {
 		go d.MonitorHTTPProgress(&dler, dlinfo)
 		dler.Wait()
 		fmt.Println(mime)
-		d.HandleTorrentDownload(&dler, dlinfo)
+		if dlinfo.MimeType == "application/x-bittorrent" {
+			d.HandleTorrentDownload(&dler, dlinfo)
+		}
 	}()
 	return gid
 }
