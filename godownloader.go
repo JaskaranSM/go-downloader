@@ -236,6 +236,7 @@ func (d *DownloadEngine) MonitorTorrentProgress(t *torrent.Torrent, dlinfo *Down
 		dlinfo.CompletedLength = completed
 		dlinfo.Speed = speed
 		dlinfo.TotalLength = total
+		dlinfo.ETA = CalculateETA(dlinfo.TotalLength-dlinfo.CompletedLength, dlinfo.Speed)
 		d.NotifyEvent(EventProgress, dlinfo.Gid)
 	}
 	dlinfo.IsComplete = true
@@ -262,6 +263,7 @@ func (d *DownloadEngine) MonitorHTTPProgress(dler *HTTPDownloader, dlinfo *Downl
 			speed = progress.Downloaded / int64(progress.Elapsed.Seconds())
 		}
 		dlinfo.Speed = int64(speed)
+		dlinfo.ETA = CalculateETA(dlinfo.TotalLength-dlinfo.CompletedLength, dlinfo.Speed)
 		d.NotifyEvent(EventProgress, dlinfo.Gid)
 	}
 	if dlinfo.MimeType != "application/x-bittorrent" {
