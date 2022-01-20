@@ -93,7 +93,9 @@ func (d *DownloadEngine) CancelDownloadByGid(gid string) {
 		dlinfo.Dler.CancelDownload()
 	} else {
 		dlinfo.Torrent.Drop()
-		dlinfo.CancellationChannel <- true
+		if dlinfo.IsMetadata {
+			dlinfo.CancellationChannel <- true
+		}
 	}
 	d.NotifyEvent(EventStop, gid)
 }
@@ -194,7 +196,12 @@ func (d *DownloadEngine) HandleDownloadRequest(dr *DownloadRequest) string {
 func (d *DownloadEngine) HandleTorrentDownload(dler *HTTPDownloader, dlinfo *DownloadInfo) {
 	config := torrent.NewDefaultClientConfig()
 	config.DataDir = dlinfo.Dir
-	dlinfo.TorrentClient, _ = torrent.NewClient(config)
+	config.ListenPort = 42070
+	client, err := torrent.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
+	dlinfo.TorrentClient = client
 	t, err := dlinfo.TorrentClient.AddTorrentFromFile(dler.GetPath())
 	if err != nil {
 		dlinfo.Error = err
