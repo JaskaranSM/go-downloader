@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"path"
 	"strconv"
+	"sync"
 	"time"
 
 	"github.com/anacrolix/torrent"
@@ -60,7 +61,6 @@ func NewDownloadEngine() *DownloadEngine {
 		dls:      make(map[string]*DownloadInfo),
 		receiver: make(chan *DownloadRequest),
 	}
-	go engine.Listener()
 	return engine
 }
 
@@ -68,6 +68,7 @@ type DownloadEngine struct {
 	dls       map[string]*DownloadInfo
 	receiver  chan *DownloadRequest
 	Listeners []DownloadListener
+	mutex     sync.Mutex
 }
 
 func (d *DownloadEngine) SendDownloadRequest(dr *DownloadRequest) {
@@ -75,6 +76,8 @@ func (d *DownloadEngine) SendDownloadRequest(dr *DownloadRequest) {
 }
 
 func (d *DownloadEngine) AddDownloadInfoByGid(gid string, dlinfo *DownloadInfo) {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 	d.dls[gid] = dlinfo
 }
 
@@ -181,7 +184,7 @@ func (d *DownloadEngine) HandleDownloadRequest(dr *DownloadRequest) string {
 		go d.MonitorHTTPProgress(&dler, dlinfo)
 		dler.Wait()
 		fmt.Println(mime)
-		if dlinfo.MimeType == "application/x-bittorrent" {
+		if !dlinfo.IsCancelled && dlinfo.MimeType == "application/x-bittorrent" {
 			d.HandleTorrentDownload(&dler, dlinfo)
 		}
 	}()
@@ -279,6 +282,8 @@ func (d *DownloadEngine) Listener() {
 }
 
 func (d *DownloadEngine) GetDownloadInfoByGid(gid string) *DownloadInfo {
+	d.mutex.Lock()
+	defer d.mutex.Unlock()
 	for i, dl := range d.dls {
 		if i == gid {
 			return dl
