@@ -90,8 +90,8 @@ func (d *DownloadEngine) CancelDownloadByGid(gid string) {
 		dlinfo.Dler.CancelDownload()
 	} else {
 		dlinfo.Torrent.Drop()
+		dlinfo.CancellationChannel <- true
 	}
-	dlinfo.CancellationChannel <- true
 	d.NotifyEvent(EventStop, gid)
 }
 

@@ -147,6 +147,10 @@ func (dl *HTTPDownloader) StartDownload() {
 }
 
 func (dl *HTTPDownloader) CancelDownload() {
+	dl.isCancelled = true
+	for i := 0; i < dl.conns; i++ {
+		dl.parts[i].IsCancelled = true
+	}
 	dl.quit <- true
 }
 
@@ -201,12 +205,13 @@ func (dl *HTTPDownloader) Download() error {
 }
 
 type Part struct {
-	id     int
-	url    string
-	offset int
-	dlsize int64
-	size   int64
-	file   *os.File
+	id          int
+	url         string
+	offset      int
+	IsCancelled bool
+	dlsize      int64
+	size        int64
+	file        *os.File
 }
 
 func (part *Part) Download(done chan error, quit chan bool) error {
@@ -233,6 +238,9 @@ func (part *Part) Download(done chan error, quit chan bool) error {
 		case <-quit:
 			return nil
 		default:
+		}
+		if part.IsCancelled {
+			return nil
 		}
 
 		nbytes, err := resp.Body.Read(buffer[0:size])
