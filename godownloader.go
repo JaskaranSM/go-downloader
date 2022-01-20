@@ -8,6 +8,8 @@ import (
 	"time"
 
 	"github.com/anacrolix/torrent"
+	"github.com/anacrolix/torrent/metainfo"
+	"github.com/anacrolix/torrent/storage"
 )
 
 const (
@@ -57,18 +59,27 @@ func NewDownloadInfo() *DownloadInfo {
 }
 
 func NewDownloadEngine() *DownloadEngine {
+	config := torrent.NewDefaultClientConfig()
+	config.DataDir = "."
+	config.ListenPort = 42070
+	client, err := torrent.NewClient(config)
+	if err != nil {
+		panic(err)
+	}
 	engine := &DownloadEngine{
-		dls:      make(map[string]*DownloadInfo),
-		receiver: make(chan *DownloadRequest),
+		dls:           make(map[string]*DownloadInfo),
+		receiver:      make(chan *DownloadRequest),
+		torrentClient: client,
 	}
 	return engine
 }
 
 type DownloadEngine struct {
-	dls       map[string]*DownloadInfo
-	receiver  chan *DownloadRequest
-	Listeners []DownloadListener
-	mutex     sync.Mutex
+	dls           map[string]*DownloadInfo
+	receiver      chan *DownloadRequest
+	Listeners     []DownloadListener
+	mutex         sync.Mutex
+	torrentClient *torrent.Client
 }
 
 func (d *DownloadEngine) SendDownloadRequest(dr *DownloadRequest) {
@@ -136,12 +147,18 @@ func (d *DownloadEngine) HandleDownloadRequest(dr *DownloadRequest) string {
 	dlinfo.Gid = gid
 	if IsMagnet(dr.URL) {
 		dlinfo.Type = "TORRENT"
-		config := torrent.NewDefaultClientConfig()
-		config.DataDir = dlinfo.Dir
 		d.AddDownloadInfoByGid(gid, dlinfo)
 		d.NotifyEvent(EventStart, gid)
-		dlinfo.TorrentClient, _ = torrent.NewClient(config)
-		t, err := dlinfo.TorrentClient.AddMagnet(dr.URL)
+		spec, err := torrent.TorrentSpecFromMagnetUri(dr.URL)
+		spec.Storage = storage.NewFile(dlinfo.Dir)
+		if err != nil {
+			dlinfo.Error = err
+			dlinfo.IsComplete = false
+			dlinfo.IsFailed = true
+			d.NotifyEvent(EventStop, dlinfo.Gid)
+			return gid
+		}
+		t, _, err := d.torrentClient.AddTorrentSpec(spec)
 		if err != nil {
 			dlinfo.Error = err
 			dlinfo.IsComplete = false
@@ -194,15 +211,17 @@ func (d *DownloadEngine) HandleDownloadRequest(dr *DownloadRequest) string {
 }
 
 func (d *DownloadEngine) HandleTorrentDownload(dler *HTTPDownloader, dlinfo *DownloadInfo) {
-	config := torrent.NewDefaultClientConfig()
-	config.DataDir = dlinfo.Dir
-	config.ListenPort = 42070
-	client, err := torrent.NewClient(config)
+	mi, err := metainfo.LoadFromFile(dler.GetPath())
 	if err != nil {
-		panic(err)
+		dlinfo.Error = err
+		dlinfo.IsComplete = false
+		dlinfo.IsFailed = true
+		d.NotifyEvent(EventStop, dlinfo.Gid)
+		return
 	}
-	dlinfo.TorrentClient = client
-	t, err := dlinfo.TorrentClient.AddTorrentFromFile(dler.GetPath())
+	spec := torrent.TorrentSpecFromMetaInfo(mi)
+	spec.Storage = storage.NewFile(dlinfo.Dir)
+	t, _, err := d.torrentClient.AddTorrentSpec(spec)
 	if err != nil {
 		dlinfo.Error = err
 		dlinfo.IsComplete = false
